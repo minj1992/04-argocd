@@ -256,9 +256,30 @@ Use the following credentials to log into the web application:
 ---
 
 ## 🔹 10. Cleanup
-To remove all resources created by this lab:
+To remove all resources created by this lab, use the following commands:
 
+### 1. Delete Root Application
 ```bash
 # Delete the root application
 kubectl delete -f root-argocd.yaml
+```
+
+### 2. Delete All Child Applications
+If child applications are still running in the ArgoCD UI, delete them manually:
+```bash
+# Delete all applications in the argocd namespace
+kubectl delete apps --all -n argocd
+```
+
+### 3. Force Delete (If apps are stuck)
+If applications are stuck in "Deleting" status, remove their finalizers to force delete:
+```bash
+# Remove finalizers and delete all apps
+kubectl get apps -n argocd -o name | xargs -I {} kubectl patch {} -n argocd --type=merge -p '{"metadata":{"finalizers":null}}' && kubectl delete apps --all -n argocd
+```
+
+### 4. Remove Namespace
+```bash
+# (Optional) Delete the application namespace
+kubectl delete namespace enterprise-lab
 ```
