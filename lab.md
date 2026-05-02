@@ -114,7 +114,30 @@ Each microservice communicates asynchronously via RabbitMQ for real-time auditin
 - **Database Metrics**: Automatic discovery of active tables and user counts.
 - **Architecture-as-Code**: The Frontend renders `lab.md` directly into the UI for documentation accessibility.
 
-## 🔹 5. Build and Push (Detailed Steps)
+## 🔹 5. Automated Build and Deploy (Recommended)
+Instead of building each service manually, you can use the provided automation script to rebuild images, push them, and update Kubernetes manifests automatically.
+
+### Usage:
+```bash
+# 1. Ensure you are logged into Docker
+docker login -u minjteck
+
+# 2. Make the script executable
+chmod +x rebuild_and_deploy.sh
+
+# 3. Run the script with a new tag (e.g., v2)
+./rebuild_and_deploy.sh v2
+```
+
+### What the script does:
+1.  **Shared Helpers**: Automatically copies `mq_helper.py` to each service's directory.
+2.  **Docker Build**: Rebuilds the images for all 7 microservices.
+3.  **Docker Push**: Pushes the new images to the registry with the specified tag.
+4.  **Manifest Update**: Uses `sed` to automatically update the `image:` tag in all `deployment.yaml` files inside `argocd/manifests/`.
+
+---
+
+## 🔹 6. Manual Build and Push (Detailed Steps)
 
 ### Step 1: Login to Docker
 ```bash
@@ -179,11 +202,11 @@ docker push minjteck/logout-service:v1
 cd ../../..
 ```
 
-## 🔹 6. Deployment Steps
+## 🔹 7. Deployment Steps
 1. **Initialize Root App**: `kubectl apply -f root-argocd.yaml`
 2. **ArgoCD Cascading**: The root app creates the child apps, which then create the manifests for each service.
 
-## 🔹 7. Manifest Architecture & Usage
+## 🔹 8. Manifest Architecture & Usage
 Each microservice is bundled with specific Kubernetes objects that enable enterprise features:
 
 | Manifest | Purpose | Application Usage |
@@ -195,16 +218,47 @@ Each microservice is bundled with specific Kubernetes objects that enable enterp
 | **PVC / SC** | Persistence | Ensures MySQL and Redis data survives pod restarts. Used for the `/data` mount point. |
 | **RBAC** | Permissions | (Frontend Only) Allows the Python code to query `kubectl` style data from within the pod. |
 
-## 🔹 8. Validation
-### Default Admin Credentials
+## 🔹 9. Validation Steps
+Follow these steps to ensure the entire enterprise stack is healthy:
+
+### 1. ArgoCD Status Check
+Verify that the Root app and all 10 Child apps are `Synced` and `Healthy`:
+```bash
+# List all applications managed by ArgoCD
+kubectl get applications -n argocd
+```
+
+**Common Sync Issues:**
+- **`OutOfSync`**: This usually means the resources (Pods, Services) are not yet created in the cluster. Click **SYNC** in the ArgoCD UI or wait for the automated sync.
+
+### 2. Kubernetes Resource Check
+Ensure all pods in the enterprise namespace are running:
+```bash
+# Check pod status (should all be 'Running')
+kubectl get pods -n enterprise-lab
+
+# Check services
+kubectl get svc -n enterprise-lab
+```
+
+### 3. Log Validation
+Check the Audit service logs to verify inter-service communication via RabbitMQ:
+```bash
+kubectl logs -f deployment/audit-service -n enterprise-lab
+```
+
+### 4. Default Admin Credentials
 Use the following credentials to log into the web application:
 - **Username**: `admin`
 - **Email**: `admin@devops.com`
 - **Password**: `admin`
 
-### Check Real-time Events
-To see the RabbitMQ communication in action:
+---
+
+## 🔹 10. Cleanup
+To remove all resources created by this lab:
+
 ```bash
-kubectl logs -f deployment/audit-service -n enterprise-lab
+# Delete the root application
+kubectl delete -f root-argocd.yaml
 ```
-Now, go to the Frontend UI, login or register, and you will see the **[AUDIT]** logs appear instantly in your terminal!
